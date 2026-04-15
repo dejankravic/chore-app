@@ -204,50 +204,15 @@ app.post('/api/log', async (req, res) => {
   const chore = db.chores.find(c => c.id === choreId);
   const now = new Date();
 
-  // toggle / stale-pending logic
+  // If already pending — toggle it off (tap again to cancel)
   const idx = db.week.pending.findIndex(p => p.kid === kid && p.choreId === choreId);
   if (idx >= 0) {
-    const existingEntry = db.week.pending[idx];
-    const pendingDate = new Date(existingEntry.time).toDateString();
-    const isStaleDaily = chore && chore.freq === 'daily' && pendingDate !== now.toDateString();
-    if (isStaleDaily) {
-      // Stale daily pending from a previous day — replace with today's
-      db.week.pending.splice(idx, 1);
-      // fall through to add fresh pending entry below
-    } else {
-      // Same-day pending (or non-daily): toggle it off
-      db.week.pending.splice(idx, 1);
-      await writeDB(db);
-      return res.json({ ok: true, action: 'removed' });
-    }
+    db.week.pending.splice(idx, 1);
+    await writeDB(db);
+    return res.json({ ok: true, action: 'removed' });
   }
 
-  const approvedCount = (db.week.approved[kid] || {})[choreId] || 0;
-  const lastDate = (db.week.approvalDates[kid] || {})[choreId];
-
-  if (chore) {
-    if (chore.freq === 'daily') {
-      if (lastDate === now.toDateString()) {
-        return res.json({ ok: false, reason: 'already_approved_today' });
-      }
-    } else if (chore.freq === 'weekly') {
-      if (approvedCount >= 1) {
-        return res.json({ ok: false, reason: 'already_approved_this_week' });
-      }
-    } else if (chore.freq === 'biweekly') {
-      if (approvedCount >= 2) {
-        return res.json({ ok: false, reason: 'max_biweekly_reached' });
-      }
-    } else if (chore.freq === 'monthly') {
-      if (lastDate) {
-        const last = new Date(lastDate);
-        if (last.getMonth() === now.getMonth() && last.getFullYear() === now.getFullYear()) {
-          return res.json({ ok: false, reason: 'already_approved_this_month' });
-        }
-      }
-    }
-  }
-
+  // No frequency blocking — just add to pending, parent decides
   db.week.pending.push({ kid, choreId, time: now.toISOString() });
   await writeDB(db);
   res.json({ ok: true, action: 'added' });
