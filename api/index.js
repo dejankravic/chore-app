@@ -1,5 +1,10 @@
 const express = require('express');
-const { kv } = require('@vercel/kv');
+const { createClient } = require('@supabase/supabase-js');
+
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_ANON_KEY
+);
 
 const app = express();
 app.use(express.json());
@@ -104,8 +109,13 @@ function defaultDB() {
 
 async function readDB() {
   try {
-    let db = await kv.get(DB_KEY);
-    if (!db) {
+    const { data, error } = await supabase
+      .from('chore_kv')
+      .select('value')
+      .eq('key', DB_KEY)
+      .single();
+    let db = data?.value || null;
+    if (!db || error) {
       db = defaultDB();
       await writeDB(db);
       return db;
@@ -125,7 +135,9 @@ async function readDB() {
 }
 
 async function writeDB(db) {
-  await kv.set(DB_KEY, db);
+  await supabase
+    .from('chore_kv')
+    .upsert({ key: DB_KEY, value: db });
 }
 
 function archiveWeek(db) {
