@@ -1,0 +1,883 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Chores">
+<meta name="theme-color" content="#0f0f0f">
+<title>Chore Tracker</title>
+<link rel="manifest" href="/manifest.json">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0f0f0f;--surface:#1a1a1a;--surface2:#222;--border:#2e2e2e;--text:#f0ede8;--muted:#777;--faint:#2a2a2a;--green:#7ed98f;--green-dim:#1e3a24;--blue:#7ab8f5;--blue-dim:#1a2e42;--amber:#f5c842;--amber-dim:#332d0e;--red:#f57a7a;--red-dim:#2e1a1a;--purple:#b89cf5;--purple-dim:#261e3a;--accent:#f5c842;}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+html,body{height:100%;overflow:hidden;}
+body{background:var(--bg);color:var(--text);font-family:'Syne',sans-serif;font-size:14px;display:flex;flex-direction:column;}
+input,select,textarea,button{font-family:'Syne',sans-serif;}
+
+/* LAYOUT */
+nav{display:flex;align-items:center;border-bottom:1px solid var(--border);background:var(--surface);flex-shrink:0;overflow-x:auto;-webkit-overflow-scrolling:touch;}
+nav::-webkit-scrollbar{display:none;}
+.nav-logo{padding:14px 16px;font-size:13px;font-weight:800;color:var(--text);letter-spacing:0.1em;border-right:1px solid var(--border);white-space:nowrap;flex-shrink:0;}
+.nav-btn{padding:14px 14px;font-size:11px;font-weight:600;letter-spacing:0.06em;border:none;background:none;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;flex-shrink:0;text-transform:uppercase;}
+.nav-btn.active{color:var(--accent);border-bottom-color:var(--accent);}
+.nav-btn:hover:not(.active){color:var(--text);}
+.content{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;}
+.view{display:none;padding:20px;}
+.view.active{display:block;}
+#tv{padding:0;}
+#tv.active{display:flex;flex-direction:column;height:100%;}
+
+/* SYNC INDICATOR */
+.sync-dot{width:7px;height:7px;border-radius:50%;background:var(--green);display:inline-block;margin-left:8px;flex-shrink:0;}
+.sync-dot.syncing{background:var(--amber);}
+.sync-dot.error{background:var(--red);}
+
+/* TV MODE */
+.tv-header{display:flex;justify-content:space-between;align-items:center;padding:16px 24px;border-bottom:1px solid var(--border);flex-shrink:0;}
+.tv-title{font-size:11px;font-weight:600;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted);}
+.tv-date{font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;}
+.tv-kids{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border);flex:1;min-height:0;}
+.tv-kid{background:var(--bg);padding:20px;overflow-y:auto;}
+.tv-kid-name{font-size:11px;font-weight:600;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted);margin-bottom:4px;}
+.tv-pts{font-size:64px;font-weight:800;line-height:1;}
+.tv-pts-label{font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;margin-bottom:10px;}
+.progress-track{height:4px;background:var(--faint);border-radius:2px;overflow:hidden;margin-bottom:3px;}
+.progress-fill{height:100%;border-radius:2px;transition:width 0.6s cubic-bezier(.4,0,.2,1);}
+.progress-labels{display:flex;justify-content:space-between;margin-bottom:10px;}
+.progress-lbl{font-size:9px;color:var(--muted);font-family:'DM Mono',monospace;}
+.tv-tier-badge{display:inline-flex;align-items:center;padding:4px 10px;border-radius:4px;font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;margin-bottom:6px;}
+.mand-status{font-size:11px;padding:4px 8px;border-radius:3px;font-weight:600;margin-bottom:8px;display:inline-block;}
+.mand-ok{background:var(--green-dim);color:var(--green);}
+.mand-fail{background:var(--red-dim);color:var(--red);}
+.tv-unlocks{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:12px;}
+.tv-unlock{padding:3px 8px;border-radius:3px;font-size:10px;font-weight:600;}
+.u-on{background:var(--green-dim);color:var(--green);border:1px solid #2a6338;}
+.u-off{background:var(--faint);color:var(--muted);border:1px solid var(--border);text-decoration:line-through;}
+.u-locked{background:var(--red-dim);color:var(--red);border:1px solid #5a2a2a;text-decoration:line-through;}
+.tv-streak{display:flex;align-items:center;gap:6px;}
+.pip{width:9px;height:9px;border-radius:50%;background:var(--faint);}
+.pip.on{background:var(--amber);}
+.tv-footer{padding:10px 24px;border-top:1px solid var(--border);display:flex;justify-content:space-between;flex-shrink:0;}
+.tv-footer-note{font-size:10px;color:var(--muted);font-family:'DM Mono',monospace;}
+.tier-0{background:var(--faint);color:var(--muted);}
+.tier-1{background:var(--green-dim);color:var(--green);}
+.tier-2{background:var(--blue-dim);color:var(--blue);}
+.tier-3{background:var(--purple-dim);color:var(--purple);}
+
+/* PANELS */
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:12px;}
+.panel-header{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;}
+.panel-title{font-size:13px;font-weight:700;}
+.sec-block{padding:8px 16px;border-bottom:1px solid var(--border);}
+.sec-block:last-child{border-bottom:none;}
+.sec-heading{font-size:10px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);margin-bottom:6px;}
+.chore-item{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--faint);}
+.chore-item:last-child{border-bottom:none;}
+.chore-left{display:flex;align-items:center;gap:10px;flex:1;}
+.chk{width:22px;height:22px;border-radius:4px;border:1.5px solid var(--border);background:none;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.15s;flex-shrink:0;}
+.chk.done{background:var(--green);border-color:var(--green);}
+.chk.pend{background:var(--amber-dim);border-color:var(--amber);}
+.chk svg{width:11px;height:11px;display:none;}
+.chk.done svg,.chk.pend svg{display:block;}
+.chore-name{font-size:13px;line-height:1.3;}
+.chore-name.strikethrough{color:var(--muted);text-decoration:line-through;}
+.chore-right{display:flex;align-items:center;gap:5px;flex-shrink:0;}
+.freq-badge{font-size:9px;padding:2px 5px;border-radius:3px;font-weight:600;}
+.fd{background:#1e3a24;color:#7ed98f;}
+.fw{background:#1a2e42;color:#7ab8f5;}
+.fb{background:#332d0e;color:#f5c842;}
+.fm{background:#261e3a;color:#b89cf5;}
+.req-badge{font-size:9px;padding:2px 5px;border-radius:3px;font-weight:600;background:#2e1a1a;color:#f57a7a;}
+.pts-lbl{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);}
+.approve-item{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;margin-bottom:8px;gap:10px;}
+.approve-who{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em;}
+.approve-chore{font-size:14px;font-weight:700;margin:2px 0;}
+.approve-meta{font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;}
+.approve-btns{display:flex;gap:6px;flex-shrink:0;}
+.btn{padding:8px 14px;border-radius:4px;border:none;font-size:12px;font-weight:700;cursor:pointer;font-family:'Syne',sans-serif;min-height:40px;}
+.btn-approve{background:var(--green-dim);color:var(--green);border:1px solid #2a6338;}
+.btn-reject{background:var(--red-dim);color:var(--red);border:1px solid #5a2a2a;}
+.btn-primary{background:var(--accent);color:#000;}
+.btn-ghost{background:none;color:var(--muted);border:1px solid var(--border);}
+.btn-danger{background:var(--red-dim);color:var(--red);border:1px solid #5a2a2a;}
+.btn:active{opacity:0.7;transform:scale(0.97);}
+.empty{text-align:center;padding:36px;color:var(--muted);font-size:13px;}
+.editor-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--faint);}
+.editor-row:last-child{border-bottom:none;}
+.editor-label{font-size:13px;font-weight:600;}
+.editor-meta{font-size:11px;color:var(--muted);margin-top:2px;}
+.icon-btn{width:32px;height:32px;border-radius:4px;border:1px solid var(--border);background:none;color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;}
+.icon-btn:active{opacity:0.6;}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:100;display:flex;align-items:flex-end;justify-content:center;}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:16px 16px 0 0;padding:24px;width:100%;max-width:560px;max-height:90vh;overflow-y:auto;}
+.modal h3{font-size:16px;font-weight:700;margin-bottom:16px;}
+.form-row{margin-bottom:12px;}
+.form-label{font-size:10px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);margin-bottom:5px;}
+.form-input{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);padding:10px 12px;font-size:14px;min-height:44px;}
+.form-input:focus{outline:none;border-color:var(--accent);}
+select.form-input option{background:var(--surface2);}
+.check-row{display:flex;align-items:center;gap:10px;margin-bottom:10px;padding:8px 0;}
+.check-row input[type=checkbox]{width:20px;height:20px;accent-color:var(--accent);flex-shrink:0;}
+.modal-btns{display:flex;gap:8px;margin-top:16px;}
+.modal-btns .btn{flex:1;min-height:48px;}
+.settings-section{margin-bottom:22px;}
+.settings-label{font-size:10px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;}
+.settings-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--faint);}
+.settings-row:last-child{border-bottom:none;}
+.s-input{background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);padding:8px 10px;font-family:'DM Mono',monospace;font-size:13px;width:120px;min-height:40px;}
+.s-input:focus{outline:none;border-color:var(--accent);}
+.history-table{width:100%;border-collapse:collapse;}
+.history-table th{font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:var(--muted);padding:8px 12px;text-align:left;border-bottom:1px solid var(--border);font-weight:600;}
+.history-table td{padding:8px 12px;font-size:12px;border-bottom:1px solid var(--faint);}
+.tag{font-size:10px;padding:2px 6px;border-radius:3px;font-weight:700;}
+.lbl{font-size:10px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);margin-bottom:6px;}
+h2{font-size:18px;font-weight:800;margin-bottom:4px;}
+.sub{font-size:12px;color:var(--muted);margin-bottom:16px;}
+.flex{display:flex;}.gap8{gap:8px;}.mt8{margin-top:8px;}.mt16{margin-top:16px;}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 20px;font-size:13px;opacity:0;pointer-events:none;transition:opacity 0.3s;z-index:999;white-space:nowrap;}
+.toast.show{opacity:1;}
+
+/* PIN */
+.pin-screen{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:70vh;gap:20px;}
+.pin-title{font-size:16px;font-weight:700;}
+.pin-sub{font-size:12px;color:var(--muted);}
+.pin-dots{display:flex;gap:14px;}
+.pin-dot{width:14px;height:14px;border-radius:50%;border:1.5px solid var(--border);transition:all 0.15s;}
+.pin-dot.filled{background:var(--accent);border-color:var(--accent);}
+.pin-pad{display:grid;grid-template-columns:repeat(3,80px);gap:10px;}
+.pin-key{height:80px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:24px;font-weight:700;cursor:pointer;font-family:'Syne',sans-serif;}
+.pin-key:active{transform:scale(0.93);background:var(--faint);}
+.pin-key.del{font-size:18px;color:var(--muted);}
+.pin-error{font-size:12px;color:var(--red);height:16px;text-align:center;}
+
+/* SIDEBAR LAYOUT for wider screens */
+@media(min-width:600px){
+  .log-layout{display:flex;gap:16px;align-items:flex-start;}
+  .log-chores{flex:1;}
+  .log-sidebar{width:200px;flex-shrink:0;}
+  .tv-pts{font-size:80px;}
+  .modal-overlay{align-items:center;}
+  .modal{border-radius:12px;max-width:480px;}
+  .pin-pad{grid-template-columns:repeat(3,88px);}
+  .pin-key{height:88px;}
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-logo">CHORES <span class="sync-dot" id="sync-dot"></span></div>
+  <button class="nav-btn active" onclick="showView('tv',this)">Display</button>
+  <button class="nav-btn" onclick="showView('log',this)">Log</button>
+  <button class="nav-btn" onclick="goApprove(this)">Approve <span id="approve-count"></span></button>
+  <button class="nav-btn" onclick="showView('history',this)">History</button>
+  <button class="nav-btn" onclick="showView('chore-editor',this)">Chores</button>
+  <button class="nav-btn" onclick="showView('unlock-editor',this)">Unlocks</button>
+  <button class="nav-btn" onclick="showView('settings',this)">Settings</button>
+</nav>
+
+<div class="content">
+
+<div class="view active" id="tv">
+  <div class="tv-header">
+    <div class="tv-title">Weekly tracker</div>
+    <div class="tv-date" id="tv-date"></div>
+  </div>
+  <div class="tv-kids" id="tv-kids"></div>
+  <div class="tv-footer">
+    <div class="tv-footer-note" id="tv-week"></div>
+    <div class="tv-footer-note">* = monthly</div>
+  </div>
+</div>
+
+<div class="view" id="log">
+  <h2>Log chores</h2>
+  <p class="sub">Tick what you've done today. Goes to parent for approval.</p>
+  <div class="flex gap8" style="margin-bottom:16px;" id="log-tabs"></div>
+  <div id="log-body"></div>
+</div>
+
+<div class="view" id="approve">
+  <div id="approve-pin-gate"></div>
+  <div id="approve-content" style="display:none;">
+    <div class="flex" style="justify-content:space-between;align-items:center;margin-bottom:4px;">
+      <div><h2>Approve</h2><p class="sub">Tap approve to award points.</p></div>
+      <button class="btn btn-ghost" style="font-size:11px;padding:6px 12px;" onclick="lockApprove()">Lock</button>
+    </div>
+    <div id="approve-list"></div>
+  </div>
+</div>
+
+<div class="view" id="history">
+  <h2>History</h2>
+  <p class="sub">Auto-archived each Monday.</p>
+  <div id="history-body"></div>
+</div>
+
+<div class="view" id="chore-editor">
+  <div class="flex" style="justify-content:space-between;align-items:center;margin-bottom:4px;">
+    <h2>Edit chores</h2>
+    <button class="btn btn-primary" style="min-height:36px;padding:6px 14px;" onclick="openChoreModal(null)">+ Add</button>
+  </div>
+  <p class="sub">Add, edit, or remove chores. Mark required chores with the checkbox.</p>
+  <div id="chore-editor-body"></div>
+</div>
+
+<div class="view" id="unlock-editor">
+  <div class="flex" style="justify-content:space-between;align-items:center;margin-bottom:4px;">
+    <h2>Edit unlocks</h2>
+    <button class="btn btn-primary" style="min-height:36px;padding:6px 14px;" onclick="openUnlockModal(0,null)">+ Add</button>
+  </div>
+  <p class="sub">Define what each tier unlocks, per kid.</p>
+  <div id="unlock-editor-body"></div>
+</div>
+
+<div class="view" id="settings">
+  <h2>Settings</h2>
+  <p class="sub">Names, thresholds, PIN.</p>
+  <div class="settings-section">
+    <div class="settings-label">Kid names</div>
+    <div class="settings-row"><span>Kid 1</span><input class="s-input" id="set-n0" type="text"></div>
+    <div class="settings-row"><span>Kid 2</span><input class="s-input" id="set-n1" type="text"></div>
+  </div>
+  <div class="settings-section">
+    <div class="settings-label">Tier thresholds (pts/week)</div>
+    <div class="settings-row"><span>Tier 1 min</span><input class="s-input" id="set-t1" type="number"></div>
+    <div class="settings-row"><span>Tier 2 min</span><input class="s-input" id="set-t2" type="number"></div>
+    <div class="settings-row"><span>Tier 3 min</span><input class="s-input" id="set-t3" type="number"></div>
+  </div>
+  <div class="settings-section">
+    <div class="settings-label">Rules</div>
+    <div class="settings-row"><span>Streak weeks for free pass</span><input class="s-input" id="set-streak" type="number"></div>
+    <div class="settings-row"><span>Required chore min days</span><input class="s-input" id="set-mand" type="number"></div>
+  </div>
+  <div class="settings-section">
+    <div class="settings-label">Approve PIN</div>
+    <div class="settings-row">
+      <span>Change PIN (4–6 digits)</span>
+      <div class="flex gap8">
+        <input class="s-input" id="set-pin" type="password" maxlength="6" placeholder="new PIN" style="width:90px;">
+        <button class="btn btn-ghost" style="min-height:36px;padding:6px 12px;font-size:12px;" onclick="changePin()">Set</button>
+      </div>
+    </div>
+  </div>
+  <button class="btn btn-primary" style="width:100%;min-height:48px;margin-bottom:16px;" onclick="saveSettings()">Save settings</button>
+  <div class="settings-section">
+    <div class="settings-label">Danger zone</div>
+    <div class="flex gap8">
+      <button class="btn btn-danger" style="flex:1;" onclick="doResetWeek()">Reset week</button>
+      <button class="btn btn-ghost" style="flex:1;" onclick="doResetAll()">Reset all</button>
+    </div>
+  </div>
+</div>
+
+</div><!-- /content -->
+
+<div class="modal-overlay" id="modal" style="display:none;" onclick="maybeCloseModal(event)">
+  <div class="modal" id="modal-inner"></div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+// ── STATE ─────────────────────────────────────────────────────────────────────
+let STATE = null;
+let approveUnlocked = false;
+let logKid = 0;
+let pinBuffer = '';
+let syncing = false;
+
+// ── API ───────────────────────────────────────────────────────────────────────
+function setSyncStatus(s) {
+  const dot = document.getElementById('sync-dot');
+  if (!dot) return;
+  dot.className = 'sync-dot' + (s === 'ok' ? '' : s === 'syncing' ? ' syncing' : ' error');
+}
+
+async function api(method, path, body) {
+  setSyncStatus('syncing');
+  try {
+    const opts = { method, headers: { 'Content-Type': 'application/json' } };
+    if (body) opts.body = JSON.stringify(body);
+    const res = await fetch('/api' + path, opts);
+    const data = await res.json();
+    setSyncStatus('ok');
+    return { ok: res.ok, data };
+  } catch (e) {
+    setSyncStatus('error');
+    return { ok: false, error: e.message };
+  }
+}
+
+async function fetchState() {
+  const r = await api('GET', '/state');
+  if (r.ok) {
+    STATE = r.data;
+    updateApproveCount();
+    rerenderCurrentView();
+  }
+}
+
+function rerenderCurrentView() {
+  const active = document.querySelector('.view.active');
+  if (!active || !STATE) return;
+  const id = active.id;
+  const renders = { tv: renderTV, log: renderLogBody, history: renderHistory, 'chore-editor': renderChoreEditor, 'unlock-editor': renderUnlockEditor, settings: renderSettings };
+  if (id === 'approve' && approveUnlocked) renderApprove();
+  else if (renders[id]) renders[id]();
+}
+
+// ── HELPERS ───────────────────────────────────────────────────────────────────
+function approvedPts(k) {
+  let pts = 0;
+  const ap = STATE.week.approved[k] || {};
+  Object.keys(ap).forEach(id => {
+    const c = STATE.chores.find(x => x.id === id);
+    if (c) pts += (ap[id] || 0) * c.pts;
+  });
+  return pts;
+}
+function pendingPts(k) {
+  let pts = approvedPts(k);
+  const today = new Date().toDateString();
+  (STATE.week.pending || []).filter(p => {
+    if (p.kid !== k) return false;
+    const c = STATE.chores.find(x => x.id === p.choreId);
+    // Exclude stale daily pending (logged on a previous day, not yet approved)
+    if (c && c.freq === 'daily' && new Date(p.time).toDateString() !== today) return false;
+    return true;
+  }).forEach(p => {
+    const c = STATE.chores.find(x => x.id === p.choreId);
+    if (c) pts += c.pts;
+  });
+  return pts;
+}
+function mandOk(k) {
+  const min = STATE.settings.mandMin || 5;
+  const mands = STATE.chores.filter(c => c.mandatory);
+  if (!mands.length) return true;
+  const ap = STATE.week.approved[k] || {};
+  return mands.every(c => (ap[c.id] || 0) >= min);
+}
+function mandProgress(k) {
+  const min = STATE.settings.mandMin || 5;
+  return STATE.chores.filter(c => c.mandatory).map(c => ({
+    name: c.name, done: (STATE.week.approved[k] || {})[c.id] || 0, need: min
+  }));
+}
+function getTier(pts) {
+  const S = STATE.settings;
+  if (pts >= S.t3) return 3;
+  if (pts >= S.t2) return 2;
+  if (pts >= S.t1) return 1;
+  return 0;
+}
+function tierLabel(t) { return ['No tier','Tier 1 — basic','Tier 2 — standard','Tier 3 — full'][t]; }
+function tierCls(t) { return ['tier-0','tier-1','tier-2','tier-3'][t]; }
+function tierColor(t) { return ['var(--muted)','var(--green)','var(--blue)','var(--purple)'][t]; }
+function barColor(t) { return ['var(--faint)','var(--green)','var(--blue)','var(--purple)'][t]; }
+function freqCls(f) { return {daily:'fd',weekly:'fw',biweekly:'fb',monthly:'fm'}[f]||'fw'; }
+function updateApproveCount() {
+  const n = (STATE?.week?.pending || []).length;
+  document.getElementById('approve-count').textContent = n > 0 ? `(${n})` : '';
+}
+
+// ── VIEW ROUTING ──────────────────────────────────────────────────────────────
+function showView(id, btn) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  if (btn) btn.classList.add('active');
+  if (!STATE) return;
+  const renders = { tv: renderTV, log: renderLog, history: renderHistory, 'chore-editor': renderChoreEditor, 'unlock-editor': renderUnlockEditor, settings: renderSettings };
+  if (renders[id]) renders[id]();
+}
+
+// ── TV ────────────────────────────────────────────────────────────────────────
+function renderTV() {
+  if (!STATE) return;
+  const S = STATE.settings;
+  document.getElementById('tv-date').textContent = new Date().toLocaleDateString('en-GB', { weekday:'long', day:'numeric', month:'long' });
+  document.getElementById('tv-week').textContent = 'Week of ' + new Date(STATE.week.start).toLocaleDateString('en-GB', { day:'numeric', month:'short' });
+  let html = '';
+  for (let k = 0; k < 2; k++) {
+    const pts = approvedPts(k), mok = mandOk(k);
+    const tier = mok ? getTier(pts) : 0, pct = Math.min(100, Math.round(pts / 100 * 100));
+    const mp = mandProgress(k);
+    const streak = STATE.kids[k].streak || 0, target = S.streakTarget || 4;
+    const unlocks = (STATE.unlocks[k] || []).map(u => {
+      const cls = !mok ? 'u-locked' : tier >= u.tier ? 'u-on' : 'u-off';
+      return `<span class="tv-unlock ${cls}">${u.name}${u.monthly?' *':''}</span>`;
+    }).join('');
+    const mandHtml = mp.map(m =>
+      `<span style="font-size:10px;color:${m.done>=m.need?'var(--green)':'var(--red)'};margin-right:8px;">${m.done>=m.need?'✓':'✗'} ${m.name} (${m.done}/${m.need})</span>`
+    ).join('');
+    const pips = Array.from({length:target}, (_,i) => `<div class="pip${i<streak?' on':''}"></div>`).join('');
+    html += `<div class="tv-kid">
+      <div class="tv-kid-name">${S.names[k]}</div>
+      <div class="tv-pts" style="color:${tierColor(tier)}">${pts}</div>
+      <div class="tv-pts-label">points this week</div>
+      <div class="progress-track"><div class="progress-fill" style="width:${pct}%;background:${barColor(tier)}"></div></div>
+      <div class="progress-labels"><span class="progress-lbl">0</span><span class="progress-lbl">T1:${S.t1}</span><span class="progress-lbl">T2:${S.t2}</span><span class="progress-lbl">T3:${S.t3}</span></div>
+      <span class="tv-tier-badge ${tierCls(tier)}">${tierLabel(tier)}</span><br>
+      <span class="mand-status ${mok?'mand-ok':'mand-fail'}">${mok?'Required: met':'Required: NOT met'}</span>
+      <div style="display:flex;flex-wrap:wrap;margin-bottom:8px;">${mandHtml}</div>
+      <div class="lbl">Unlocks</div>
+      <div class="tv-unlocks">${unlocks}</div>
+      <div class="tv-streak">
+        <span style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em;">Streak</span>
+        <div class="flex" style="gap:4px;">${pips}</div>
+        <span style="font-size:10px;color:var(--muted);">${streak>=target?'Free pass!':streak+'/'+target}</span>
+      </div>
+    </div>`;
+  }
+  document.getElementById('tv-kids').innerHTML = html;
+}
+
+// ── LOG ───────────────────────────────────────────────────────────────────────
+function renderLog() {
+  if (!STATE) return;
+  document.getElementById('log-tabs').innerHTML = STATE.settings.names.map((n, k) =>
+    `<button class="nav-btn${k===logKid?' active':''}" style="border-radius:4px;" onclick="setLogKid(${k})">${n}</button>`
+  ).join('');
+  renderLogBody();
+}
+function setLogKid(k) { logKid = k; renderLog(); }
+function renderLogBody() {
+  if (!STATE) return;
+  const k = logKid, S = STATE.settings;
+  const pts = approvedPts(k), ppts = pendingPts(k), mok = mandOk(k);
+  const tier = mok ? getTier(pts) : 0, pct = Math.min(100, Math.round(pts / 100 * 100));
+  const sections = ['Daily','Weekly','Less frequent'];
+  let choreHtml = '';
+  sections.forEach(sec => {
+    const chores = STATE.chores.filter(c => c.section === sec);
+    if (!chores.length) return;
+    choreHtml += `<div class="panel"><div class="sec-block"><div class="sec-heading">${sec}</div>`;
+    chores.forEach(c => {
+      const ap = (STATE.week.approved[k] || {})[c.id] || 0;
+      const today = new Date().toDateString();
+      const rawPend = (STATE.week.pending || []).find(p => p.kid === k && p.choreId === c.id);
+      // For daily chores a pending entry from a previous day is stale — treat the chore as fresh
+      const isPend = rawPend && (c.freq !== 'daily' || new Date(rawPend.time).toDateString() === today);
+      const nowM = new Date();
+      const lastDate = (STATE.week.approvalDates?.[k] || {})[c.id];
+      let approvedToday = false;
+      if (c.freq === 'daily') approvedToday = ap > 0 && lastDate === today;
+      else if (c.freq === 'weekly') approvedToday = ap >= 1;
+      else if (c.freq === 'biweekly') approvedToday = ap >= 2;
+      else if (c.freq === 'monthly') {
+        if (lastDate) { const l = new Date(lastDate); approvedToday = l.getMonth() === nowM.getMonth() && l.getFullYear() === nowM.getFullYear(); }
+      }
+      choreHtml += `<div class="chore-item">
+        <div class="chore-left">
+          <div class="chk${approvedToday?' done':isPend?' pend':''}" onclick="toggleChore(${k},'${c.id}')">
+            <svg viewBox="0 0 10 8" fill="none" stroke="${isPend?'#f5c842':'#0f0f0f'}" stroke-width="2"><polyline points="1,4 4,7 9,1"/></svg>
+          </div>
+          <span class="chore-name${approvedToday?' strikethrough':''}">${c.name}${c.mandatory?' <span class="req-badge">req</span>':''}</span>
+        </div>
+        <div class="chore-right">
+          ${isPend?'<span style="font-size:9px;color:var(--amber);">pending</span>':''}
+          ${ap>0?'<span style="font-size:9px;color:var(--green);">×'+ap+'</span>':''}
+          <span class="freq-badge ${freqCls(c.freq)}">${c.freq}</span>
+          <span class="pts-lbl">${c.pts}pt</span>
+        </div>
+      </div>`;
+    });
+    choreHtml += `</div></div>`;
+  });
+  const mp = mandProgress(k);
+  const mandHtml = mp.map(m =>
+    `<div style="font-size:12px;padding:3px 0;color:${m.done>=m.need?'var(--green)':'var(--red)'};">${m.done>=m.need?'✓':'✗'} ${m.name}: ${m.done}/${m.need} days</div>`
+  ).join('');
+  const ulHtml = (STATE.unlocks[k] || []).map(u => {
+    const on = mok && tier >= u.tier;
+    return `<div style="font-size:12px;padding:3px 0;color:${on?'var(--green)':!mok?'var(--red)':'var(--muted)'};">${on?'✓':'-'} ${u.name}</div>`;
+  }).join('');
+  const nextTier = tier===0?S.t1:tier===1?S.t2:tier===2?S.t3:null;
+  const sidebar = `<div class="panel log-sidebar">
+    <div class="panel-header"><span class="panel-title">${S.names[k]}</span><span style="font-family:'DM Mono',monospace;font-size:12px;">${pts}pts</span></div>
+    <div style="padding:12px;">
+      <div class="progress-track" style="margin-bottom:6px;"><div class="progress-fill" style="width:${pct}%;background:${barColor(tier)}"></div></div>
+      <div style="font-size:13px;font-weight:700;color:${tierColor(tier)};margin-bottom:4px;">${tierLabel(tier)}</div>
+      ${!mok?'<div style="font-size:11px;color:var(--red);margin-bottom:4px;">Required chores not met</div>':''}
+      ${nextTier?`<div style="font-size:11px;color:var(--muted);margin-bottom:4px;">${nextTier-pts} pts to next tier</div>`:''}
+      ${ppts>pts?`<div style="font-size:11px;color:var(--amber);margin-bottom:4px;">+${ppts-pts} pending</div>`:''}
+      <div class="lbl mt8">Required</div>${mandHtml}
+      <div class="lbl mt16">Unlocks</div>${ulHtml}
+    </div>
+  </div>`;
+  document.getElementById('log-body').innerHTML = `<div class="log-layout"><div class="log-chores">${choreHtml}</div>${sidebar}</div>`;
+}
+
+async function toggleChore(kid, choreId) {
+  const ap = (STATE.week.approved[kid] || {})[choreId] || 0;
+  const chore = STATE.chores.find(c => c.id === choreId);
+  const today = new Date().toDateString();
+  const now = new Date();
+  const lastDate = (STATE.week.approvalDates?.[kid] || {})[choreId];
+  if (chore) {
+    if (chore.freq === 'daily' && ap > 0 && lastDate === today) {
+      toast('Already approved today — come back tomorrow'); return;
+    }
+    if (chore.freq === 'weekly' && ap >= 1) {
+      toast('Already done this week — resets Monday'); return;
+    }
+    if (chore.freq === 'biweekly' && ap >= 2) {
+      toast('Done twice this week — maximum reached'); return;
+    }
+    if (chore.freq === 'monthly' && lastDate) {
+      const last = new Date(lastDate);
+      if (last.getMonth() === now.getMonth() && last.getFullYear() === now.getFullYear()) {
+        toast('Already done this month — resets next month'); return;
+      }
+    }
+  }
+  const r = await api('POST', '/log', { kid, choreId });
+  if (r.ok && r.data.ok === false) {
+    const msgs = {
+      already_approved_today: 'Already approved today — come back tomorrow',
+      already_approved_this_week: 'Already done this week — resets Monday',
+      max_biweekly_reached: 'Done twice this week — maximum reached',
+      already_approved_this_month: 'Already done this month — resets next month',
+    };
+    toast(msgs[r.data.reason] || 'Already approved'); return;
+  }
+  if (r.ok && r.data.action) {
+    toast(r.data.action === 'added' ? 'Sent for approval!' : 'Removed from queue');
+    await fetchState();
+  }
+}
+
+// ── APPROVE ───────────────────────────────────────────────────────────────────
+function goApprove(btn) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('approve').classList.add('active');
+  if (btn) btn.classList.add('active');
+  approveUnlocked ? showApproveContent() : showPinGate();
+}
+
+function showPinGate() {
+  pinBuffer = '';
+  document.getElementById('approve-content').style.display = 'none';
+  const pin = STATE?.settings?.pin || '1234';
+  const maxLen = pin.length;
+  document.getElementById('approve-pin-gate').innerHTML = `
+    <div class="pin-screen">
+      <div style="text-align:center;">
+        <div class="pin-title">Parent access</div>
+        <div class="pin-sub" style="margin-top:4px;">Enter PIN to approve chores</div>
+      </div>
+      <div class="pin-dots" id="pin-dots">
+        ${Array.from({length:maxLen}, () => `<div class="pin-dot"></div>`).join('')}
+      </div>
+      <div class="pin-error" id="pin-error"></div>
+      <div class="pin-pad">
+        ${[1,2,3,4,5,6,7,8,9,'',0,'⌫'].map(k =>
+          k===''?`<div></div>`:`<button class="pin-key${k==='⌫'?' del':''}" onclick="pinKey('${k}')">${k}</button>`
+        ).join('')}
+      </div>
+      <div style="font-size:11px;color:var(--muted);">PIN can be changed in Settings</div>
+    </div>`;
+  document.getElementById('approve-pin-gate').style.display = 'block';
+}
+
+function pinKey(k) {
+  const pin = STATE?.settings?.pin || '1234';
+  const maxLen = pin.length;
+  if (k === '⌫') { pinBuffer = pinBuffer.slice(0, -1); }
+  else { if (pinBuffer.length >= maxLen) return; pinBuffer += k; }
+  const dotsEl = document.getElementById('pin-dots');
+  if (dotsEl) dotsEl.innerHTML = Array.from({length:maxLen}, (_,i) =>
+    `<div class="pin-dot${i<pinBuffer.length?' filled':''}"></div>`
+  ).join('');
+  document.getElementById('pin-error').textContent = '';
+  if (pinBuffer.length === maxLen) {
+    if (pinBuffer === pin) {
+      approveUnlocked = true;
+      document.getElementById('approve-pin-gate').style.display = 'none';
+      showApproveContent();
+      toast('Unlocked!');
+    } else {
+      document.getElementById('pin-error').textContent = 'Incorrect PIN — try again';
+      pinBuffer = '';
+      if (dotsEl) {
+        dotsEl.style.transform = 'translateX(8px)';
+        setTimeout(() => { dotsEl.style.transform = 'translateX(-8px)'; setTimeout(() => { dotsEl.style.transform = ''; dotsEl.innerHTML = Array.from({length:maxLen}, () => `<div class="pin-dot"></div>`).join(''); }, 80); }, 80);
+      }
+    }
+  }
+}
+
+function showApproveContent() {
+  document.getElementById('approve-pin-gate').style.display = 'none';
+  document.getElementById('approve-content').style.display = 'block';
+  renderApprove();
+}
+
+function lockApprove() { approveUnlocked = false; showPinGate(); toast('Locked.'); }
+
+function renderApprove() {
+  if (!STATE) return;
+  const pend = STATE.week.pending || [];
+  const el = document.getElementById('approve-list');
+  if (!pend.length) { el.innerHTML = '<div class="empty">Nothing pending — all clear!</div>'; return; }
+  el.innerHTML = pend.map((p, i) => {
+    const c = STATE.chores.find(x => x.id === p.choreId);
+    const t = new Date(p.time).toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' });
+    const sofar = (STATE.week.approved[p.kid] || {})[p.choreId] || 0;
+    return `<div class="approve-item">
+      <div style="flex:1;min-width:0;">
+        <div class="approve-who">${STATE.settings.names[p.kid]}</div>
+        <div class="approve-chore">${c ? c.name : 'Unknown'}</div>
+        <div class="approve-meta">${t} · ${c?c.pts:0}pts · ×${sofar} so far${c&&c.mandatory?' · <span style="color:var(--red)">required</span>':''}</div>
+      </div>
+      <div class="approve-btns">
+        <button class="btn btn-approve" onclick="doApprove(${i})">✓</button>
+        <button class="btn btn-reject" onclick="doReject(${i})">✕</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function doApprove(i) {
+  const r = await api('POST', '/approve', { pin: STATE.settings.pin, index: i });
+  if (r.ok && r.data.ok) { toast('Approved!'); await fetchState(); renderApprove(); }
+  else toast('Error approving');
+}
+async function doReject(i) {
+  const r = await api('POST', '/reject', { pin: STATE.settings.pin, index: i });
+  if (r.ok && r.data.ok) { toast('Rejected.'); await fetchState(); renderApprove(); }
+  else toast('Error rejecting');
+}
+
+// ── HISTORY ───────────────────────────────────────────────────────────────────
+function renderHistory() {
+  if (!STATE) return;
+  let html = '';
+  for (let k = 0; k < 2; k++) {
+    const hist = STATE.kids[k].weekHistory || [];
+    html += `<div style="margin-bottom:20px;"><div class="lbl">${STATE.settings.names[k]}</div><div class="panel">`;
+    if (!hist.length) { html += '<div style="padding:14px;font-size:13px;color:var(--muted);">No history yet.</div>'; }
+    else {
+      html += `<table class="history-table"><thead><tr><th>Week</th><th>Pts</th><th>Tier</th><th>Req</th></tr></thead><tbody>`;
+      hist.forEach(h => {
+        const d = new Date(h.week).toLocaleDateString('en-GB', { day:'numeric', month:'short' });
+        html += `<tr><td>${d}</td><td style="font-family:'DM Mono',monospace;">${h.pts}</td>
+          <td><span class="tag ${tierCls(h.tier)}">${h.tier > 0 ? 'T'+h.tier : '—'}</span></td>
+          <td style="color:${h.mok?'var(--green)':'var(--red)'};">${h.mok?'✓':'✗'}</td></tr>`;
+      });
+      html += '</tbody></table>';
+    }
+    html += '</div></div>';
+  }
+  document.getElementById('history-body').innerHTML = html;
+}
+
+// ── CHORE EDITOR ──────────────────────────────────────────────────────────────
+function renderChoreEditor() {
+  if (!STATE) return;
+  const secs = ['Daily','Weekly','Less frequent'];
+  let html = '';
+  secs.forEach(sec => {
+    const chores = STATE.chores.filter(c => c.section === sec);
+    html += `<div class="panel"><div class="panel-header"><span class="panel-title">${sec}</span><span style="font-size:11px;color:var(--muted);">${chores.length}</span></div><div style="padding:0 16px;">`;
+    chores.forEach(c => {
+      html += `<div class="editor-row">
+        <div style="flex:1;min-width:0;">
+          <div class="editor-label">${c.name} ${c.mandatory?'<span class="req-badge">req</span>':''}</div>
+          <div class="editor-meta">${c.freq} · ${c.pts} pts</div>
+        </div>
+        <div class="flex gap8" style="gap:6px;margin-left:8px;">
+          <button class="icon-btn" onclick="openChoreModal('${c.id}')">✎</button>
+          <button class="icon-btn" style="color:var(--red);border-color:var(--red-dim);" onclick="deleteChore('${c.id}')">✕</button>
+        </div>
+      </div>`;
+    });
+    html += '</div></div>';
+  });
+  document.getElementById('chore-editor-body').innerHTML = html;
+}
+
+function openChoreModal(id) {
+  const c = id ? STATE.chores.find(x => x.id === id) : null;
+  document.getElementById('modal-inner').innerHTML = `
+    <h3>${c ? 'Edit chore' : 'Add chore'}</h3>
+    <div class="form-row"><div class="form-label">Name</div><input class="form-input" id="m-name" value="${c?c.name:''}" placeholder="Chore name"></div>
+    <div class="form-row"><div class="form-label">Points</div><input class="form-input" id="m-pts" type="number" value="${c?c.pts:5}"></div>
+    <div class="form-row"><div class="form-label">Frequency</div>
+      <select class="form-input" id="m-freq">${['daily','weekly','biweekly','monthly'].map(f=>`<option${c&&c.freq===f?' selected':''}>${f}</option>`).join('')}</select>
+    </div>
+    <div class="form-row"><div class="form-label">Section</div>
+      <select class="form-input" id="m-sec">${['Daily','Weekly','Less frequent'].map(s=>`<option${c&&c.section===s?' selected':''}>${s}</option>`).join('')}</select>
+    </div>
+    <div class="check-row">
+      <input type="checkbox" id="m-mand"${c&&c.mandatory?' checked':''}>
+      <label for="m-mand">Required chore — must reach min days for tier to unlock</label>
+    </div>
+    <div class="modal-btns">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveChore('${id||''}')">Save</button>
+    </div>`;
+  document.getElementById('modal').style.display = 'flex';
+}
+
+async function saveChore(id) {
+  const name = document.getElementById('m-name').value.trim();
+  if (!name) { toast('Name required'); return; }
+  const pts = parseInt(document.getElementById('m-pts').value) || 1;
+  const freq = document.getElementById('m-freq').value;
+  const section = document.getElementById('m-sec').value;
+  const mandatory = document.getElementById('m-mand').checked;
+  const r = await api('POST', '/chore', { id: id||null, name, pts, freq, section, mandatory });
+  if (r.ok) { await fetchState(); closeModal(); renderChoreEditor(); toast('Saved!'); }
+}
+
+async function deleteChore(id) {
+  if (!confirm('Delete this chore?')) return;
+  const r = await api('DELETE', '/chore/' + id);
+  if (r.ok) { await fetchState(); renderChoreEditor(); toast('Deleted.'); }
+}
+
+// ── UNLOCK EDITOR ─────────────────────────────────────────────────────────────
+function renderUnlockEditor() {
+  if (!STATE) return;
+  let html = '';
+  for (let k = 0; k < 2; k++) {
+    const ul = STATE.unlocks[k] || [];
+    html += `<div style="margin-bottom:20px;">
+      <div class="flex" style="justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <div class="lbl" style="margin:0;">${STATE.settings.names[k]}</div>
+        <button class="btn btn-ghost" style="font-size:11px;padding:5px 10px;min-height:32px;" onclick="openUnlockModal(${k},null)">+ Add</button>
+      </div>
+      <div class="panel"><div style="padding:0 16px;">`;
+    if (!ul.length) html += '<div style="padding:14px;font-size:13px;color:var(--muted);">No unlocks yet.</div>';
+    ul.forEach(u => {
+      html += `<div class="editor-row">
+        <div style="flex:1;">
+          <div class="editor-label">${u.name}</div>
+          <div class="editor-meta">${tierLabel(u.tier)}${u.monthly?' · monthly':''}</div>
+        </div>
+        <div class="flex" style="gap:6px;margin-left:8px;">
+          <button class="icon-btn" onclick="openUnlockModal(${k},'${u.id}')">✎</button>
+          <button class="icon-btn" style="color:var(--red);border-color:var(--red-dim);" onclick="deleteUnlock(${k},'${u.id}')">✕</button>
+        </div>
+      </div>`;
+    });
+    html += '</div></div></div>';
+  }
+  document.getElementById('unlock-editor-body').innerHTML = html;
+}
+
+function openUnlockModal(kid, id) {
+  const u = id ? (STATE.unlocks[kid] || []).find(x => x.id === id) : null;
+  const kidOpts = STATE.settings.names.map((n,i) => `<option value="${i}"${i===kid?' selected':''}>${n}</option>`).join('');
+  document.getElementById('modal-inner').innerHTML = `
+    <h3>${u ? 'Edit unlock' : 'Add unlock'}</h3>
+    <div class="form-row"><div class="form-label">For</div><select class="form-input" id="m-kid">${kidOpts}</select></div>
+    <div class="form-row"><div class="form-label">Name</div><input class="form-input" id="m-uname" value="${u?u.name:''}" placeholder="Unlock name"></div>
+    <div class="form-row"><div class="form-label">Required tier</div>
+      <select class="form-input" id="m-utier">${[1,2,3].map(t=>`<option value="${t}"${u&&u.tier===t?' selected':''}>${tierLabel(t)}</option>`).join('')}</select>
+    </div>
+    <div class="check-row">
+      <input type="checkbox" id="m-umonth"${u&&u.monthly?' checked':''}>
+      <label for="m-umonth">Monthly unlock (needs Tier 2+ in 3 of 4 weeks)</label>
+    </div>
+    <div class="modal-btns">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveUnlock(${kid},'${id||''}')">Save</button>
+    </div>`;
+  document.getElementById('modal').style.display = 'flex';
+}
+
+async function saveUnlock(origKid, origId) {
+  const kid = parseInt(document.getElementById('m-kid').value);
+  const name = document.getElementById('m-uname').value.trim();
+  if (!name) { toast('Name required'); return; }
+  const tier = parseInt(document.getElementById('m-utier').value);
+  const monthly = document.getElementById('m-umonth').checked;
+  const r = await api('POST', '/unlock', { kid, id: origId||null, name, tier, monthly });
+  if (r.ok) { await fetchState(); closeModal(); renderUnlockEditor(); toast('Saved!'); }
+}
+
+async function deleteUnlock(kid, id) {
+  if (!confirm('Remove this unlock?')) return;
+  const r = await api('DELETE', `/unlock/${kid}/${id}`);
+  if (r.ok) { await fetchState(); renderUnlockEditor(); toast('Removed.'); }
+}
+
+// ── SETTINGS ──────────────────────────────────────────────────────────────────
+function renderSettings() {
+  if (!STATE) return;
+  const S = STATE.settings;
+  document.getElementById('set-n0').value = S.names[0];
+  document.getElementById('set-n1').value = S.names[1];
+  document.getElementById('set-t1').value = S.t1;
+  document.getElementById('set-t2').value = S.t2;
+  document.getElementById('set-t3').value = S.t3;
+  document.getElementById('set-streak').value = S.streakTarget;
+  document.getElementById('set-mand').value = S.mandMin || 5;
+}
+
+async function saveSettings() {
+  const S = {
+    names: [document.getElementById('set-n0').value||'Kid 1', document.getElementById('set-n1').value||'Kid 2'],
+    t1: parseInt(document.getElementById('set-t1').value)||40,
+    t2: parseInt(document.getElementById('set-t2').value)||65,
+    t3: parseInt(document.getElementById('set-t3').value)||85,
+    streakTarget: parseInt(document.getElementById('set-streak').value)||4,
+    mandMin: parseInt(document.getElementById('set-mand').value)||5,
+  };
+  const r = await api('POST', '/settings', S);
+  if (r.ok) { await fetchState(); toast('Settings saved!'); }
+}
+
+async function changePin() {
+  const val = document.getElementById('set-pin').value.trim();
+  if (!/^\d{4,6}$/.test(val)) { toast('PIN must be 4–6 digits'); return; }
+  const r = await api('POST', '/settings', { pin: val });
+  if (r.ok) { await fetchState(); document.getElementById('set-pin').value = ''; toast('PIN updated!'); }
+}
+
+async function doResetWeek() {
+  if (!confirm('Reset this week? All logged and approved chores will be cleared.')) return;
+  const r = await api('POST', '/reset-week', { pin: STATE.settings.pin });
+  if (r.ok && r.data.ok) { await fetchState(); toast('Week reset.'); }
+  else toast('Error — check PIN');
+}
+
+async function doResetAll() {
+  if (!confirm('Reset ALL data including history and streaks? Cannot be undone.')) return;
+  const r = await api('POST', '/reset-all', { pin: STATE.settings.pin });
+  if (r.ok && r.data.ok) { await fetchState(); toast('All data reset.'); }
+  else toast('Error — check PIN');
+}
+
+// ── MODAL ─────────────────────────────────────────────────────────────────────
+function maybeCloseModal(e) { if (e.target === document.getElementById('modal')) closeModal(); }
+function closeModal() { document.getElementById('modal').style.display = 'none'; }
+
+// ── TOAST ─────────────────────────────────────────────────────────────────────
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 2200);
+}
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js').catch(e => console.log('SW:', e));
+}
+
+fetchState().then(() => {
+  document.getElementById('tv-date').textContent = new Date().toLocaleDateString('en-GB', { weekday:'long', day:'numeric', month:'long' });
+});
+
+// Poll server every 15 seconds for real-time sync across devices
+setInterval(fetchState, 15000);
+</script>
+</body>
+</html>
