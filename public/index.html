@@ -341,14 +341,7 @@ function approvedPts(k) {
 }
 function pendingPts(k) {
   let pts = approvedPts(k);
-  const today = new Date().toDateString();
-  (STATE.week.pending || []).filter(p => {
-    if (p.kid !== k) return false;
-    const c = STATE.chores.find(x => x.id === p.choreId);
-    // Exclude stale daily pending (logged on a previous day, not yet approved)
-    if (c && c.freq === 'daily' && new Date(p.time).toDateString() !== today) return false;
-    return true;
-  }).forEach(p => {
+  (STATE.week.pending || []).filter(p => p.kid === k).forEach(p => {
     const c = STATE.chores.find(x => x.id === p.choreId);
     if (c) pts += c.pts;
   });
@@ -458,25 +451,13 @@ function renderLogBody() {
     choreHtml += `<div class="panel"><div class="sec-block"><div class="sec-heading">${sec}</div>`;
     chores.forEach(c => {
       const ap = (STATE.week.approved[k] || {})[c.id] || 0;
-      const today = new Date().toDateString();
-      const rawPend = (STATE.week.pending || []).find(p => p.kid === k && p.choreId === c.id);
-      // For daily chores a pending entry from a previous day is stale — treat the chore as fresh
-      const isPend = rawPend && (c.freq !== 'daily' || new Date(rawPend.time).toDateString() === today);
-      const nowM = new Date();
-      const lastDate = (STATE.week.approvalDates?.[k] || {})[c.id];
-      let approvedToday = false;
-      if (c.freq === 'daily') approvedToday = ap > 0 && lastDate === today;
-      else if (c.freq === 'weekly') approvedToday = ap >= 1;
-      else if (c.freq === 'biweekly') approvedToday = ap >= 2;
-      else if (c.freq === 'monthly') {
-        if (lastDate) { const l = new Date(lastDate); approvedToday = l.getMonth() === nowM.getMonth() && l.getFullYear() === nowM.getFullYear(); }
-      }
+      const isPend = (STATE.week.pending || []).some(p => p.kid === k && p.choreId === c.id);
       choreHtml += `<div class="chore-item">
         <div class="chore-left">
-          <div class="chk${approvedToday?' done':isPend?' pend':''}" onclick="toggleChore(${k},'${c.id}')">
+          <div class="chk${isPend?' pend':''}" onclick="toggleChore(${k},'${c.id}')">
             <svg viewBox="0 0 10 8" fill="none" stroke="${isPend?'#f5c842':'#0f0f0f'}" stroke-width="2"><polyline points="1,4 4,7 9,1"/></svg>
           </div>
-          <span class="chore-name${approvedToday?' strikethrough':''}">${c.name}${c.mandatory?' <span class="req-badge">req</span>':''}</span>
+          <span class="chore-name">${c.name}${c.mandatory?' <span class="req-badge">req</span>':''}</span>
         </div>
         <div class="chore-right">
           ${isPend?'<span style="font-size:9px;color:var(--amber);">pending</span>':''}
@@ -513,38 +494,7 @@ function renderLogBody() {
 }
 
 async function toggleChore(kid, choreId) {
-  const ap = (STATE.week.approved[kid] || {})[choreId] || 0;
-  const chore = STATE.chores.find(c => c.id === choreId);
-  const today = new Date().toDateString();
-  const now = new Date();
-  const lastDate = (STATE.week.approvalDates?.[kid] || {})[choreId];
-  if (chore) {
-    if (chore.freq === 'daily' && ap > 0 && lastDate === today) {
-      toast('Already approved today — come back tomorrow'); return;
-    }
-    if (chore.freq === 'weekly' && ap >= 1) {
-      toast('Already done this week — resets Monday'); return;
-    }
-    if (chore.freq === 'biweekly' && ap >= 2) {
-      toast('Done twice this week — maximum reached'); return;
-    }
-    if (chore.freq === 'monthly' && lastDate) {
-      const last = new Date(lastDate);
-      if (last.getMonth() === now.getMonth() && last.getFullYear() === now.getFullYear()) {
-        toast('Already done this month — resets next month'); return;
-      }
-    }
-  }
   const r = await api('POST', '/log', { kid, choreId });
-  if (r.ok && r.data.ok === false) {
-    const msgs = {
-      already_approved_today: 'Already approved today — come back tomorrow',
-      already_approved_this_week: 'Already done this week — resets Monday',
-      max_biweekly_reached: 'Done twice this week — maximum reached',
-      already_approved_this_month: 'Already done this month — resets next month',
-    };
-    toast(msgs[r.data.reason] || 'Already approved'); return;
-  }
   if (r.ok && r.data.action) {
     toast(r.data.action === 'added' ? 'Sent for approval!' : 'Removed from queue');
     await fetchState();
