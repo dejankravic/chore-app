@@ -174,6 +174,7 @@ h2{font-size:18px;font-weight:800;margin-bottom:4px;}
   <button class="nav-btn" onclick="showView('log',this)">Log</button>
   <button class="nav-btn" onclick="goApprove(this)">Approve <span id="approve-count"></span></button>
   <button class="nav-btn" onclick="showView('history',this)">History</button>
+  <button class="nav-btn" onclick="showView('approval-log',this)">Approved</button>
   <button class="nav-btn" onclick="showView('chore-editor',this)">Chores</button>
   <button class="nav-btn" onclick="showView('unlock-editor',this)">Unlocks</button>
   <button class="nav-btn" onclick="showView('settings',this)">Settings</button>
@@ -215,6 +216,12 @@ h2{font-size:18px;font-weight:800;margin-bottom:4px;}
   <h2>History</h2>
   <p class="sub">Auto-archived each Monday.</p>
   <div id="history-body"></div>
+</div>
+
+<div class="view" id="approval-log">
+  <h2>Approved</h2>
+  <p class="sub">Every approved chore across all weeks.</p>
+  <div id="approval-log-body"></div>
 </div>
 
 <div class="view" id="chore-editor">
@@ -324,7 +331,7 @@ function rerenderCurrentView() {
   const active = document.querySelector('.view.active');
   if (!active || !STATE) return;
   const id = active.id;
-  const renders = { tv: renderTV, log: renderLogBody, history: renderHistory, 'chore-editor': renderChoreEditor, 'unlock-editor': renderUnlockEditor, settings: renderSettings };
+  const renders = { tv: renderTV, log: renderLogBody, history: renderHistory, 'approval-log': renderApprovalLog, 'chore-editor': renderChoreEditor, 'unlock-editor': renderUnlockEditor, settings: renderSettings };
   if (id === 'approve' && approveUnlocked) renderApprove();
   else if (renders[id]) renders[id]();
 }
@@ -384,7 +391,7 @@ function showView(id, btn) {
   document.getElementById(id).classList.add('active');
   if (btn) btn.classList.add('active');
   if (!STATE) return;
-  const renders = { tv: renderTV, log: renderLog, history: renderHistory, 'chore-editor': renderChoreEditor, 'unlock-editor': renderUnlockEditor, settings: renderSettings };
+  const renders = { tv: renderTV, log: renderLog, history: renderHistory, 'approval-log': renderApprovalLog, 'chore-editor': renderChoreEditor, 'unlock-editor': renderUnlockEditor, settings: renderSettings };
   if (renders[id]) renders[id]();
 }
 
@@ -625,6 +632,47 @@ function renderHistory() {
     html += '</div></div>';
   }
   document.getElementById('history-body').innerHTML = html;
+}
+
+// ── APPROVAL LOG ─────────────────────────────────────────────────────────────
+function renderApprovalLog() {
+  if (!STATE) return;
+  const log = STATE.approvalLog || [];
+  const body = document.getElementById('approval-log-body');
+  if (!log.length) {
+    body.innerHTML = '<div class="empty">No approvals recorded yet.<br>New approvals will appear here.</div>';
+    return;
+  }
+  // Group by calendar day
+  const groups = {};
+  const groupOrder = [];
+  log.forEach(entry => {
+    const d = new Date(entry.date).toLocaleDateString('en-GB', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
+    if (!groups[d]) { groups[d] = []; groupOrder.push(d); }
+    groups[d].push(entry);
+  });
+  let html = '';
+  groupOrder.forEach(day => {
+    const dayTotal = groups[day].reduce((s, e) => s + (e.pts || 0), 0);
+    html += `<div class="panel" style="margin-bottom:12px;">
+      <div class="panel-header">
+        <span class="panel-title">${day}</span>
+        <span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);">+${dayTotal}pt</span>
+      </div>
+      <div class="sec-block">`;
+    groups[day].forEach(entry => {
+      const col = entry.kid === 0 ? 'var(--blue)' : 'var(--green)';
+      html += `<div class="chore-item">
+        <div class="chore-left">
+          <span style="font-size:11px;font-weight:700;color:${col};min-width:72px;flex-shrink:0;">${entry.kidName}</span>
+          <span class="chore-name">${entry.choreName}</span>
+        </div>
+        <span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--green);flex-shrink:0;">+${entry.pts}pt</span>
+      </div>`;
+    });
+    html += `</div></div>`;
+  });
+  body.innerHTML = html;
 }
 
 // ── CHORE EDITOR ──────────────────────────────────────────────────────────────
