@@ -101,7 +101,8 @@ function defaultDB() {
       pending: [],
       approved: [{}, {}],
       approvalDates: [{}, {}]
-    }
+    },
+    approvalLog: []
   };
 }
 
@@ -232,6 +233,19 @@ app.post('/api/approve', async (req, res) => {
   // This ensures daily chores reset correctly the next day.
   db.week.approvalDates[p.kid][p.choreId] = new Date(p.time).toDateString();
   db.week.pending.splice(index, 1);
+
+  // Record in the permanent approval log
+  if (!db.approvalLog) db.approvalLog = [];
+  const loggedChore = db.chores.find(c => c.id === p.choreId);
+  db.approvalLog.unshift({
+    date: new Date().toISOString(),
+    kid: p.kid,
+    kidName: db.settings.names[p.kid] || `Kid ${p.kid + 1}`,
+    choreId: p.choreId,
+    choreName: loggedChore ? loggedChore.name : p.choreId,
+    pts: loggedChore ? loggedChore.pts : 0
+  });
+
   await writeDB(db);
   res.json({ ok: true });
 });
